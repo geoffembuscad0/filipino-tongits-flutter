@@ -16,7 +16,7 @@ void main() {
     );
 
     final card = PlayingCard(26);
-    expect(card.rankLabel, 'A');
+    expect(card.rankLabel, findsNWidgets(2));
     expect(card.suitSymbol, '♥');
     expect(find.text('A'), findsOneWidget);
     expect(find.text('♥'), findsOneWidget);

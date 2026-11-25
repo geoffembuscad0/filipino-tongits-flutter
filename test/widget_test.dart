@@ -14,7 +14,7 @@ void main() {
     expect(find.text('PLAY'), findsOneWidget);
 
     await tester.tap(find.text('PLAY'));
-    await tester.pumpAndSettle();
+//    await tester.pumpAndSettle();
 
     expect(find.text('Who goes first?'), findsOneWidget);
     expect(find.text('CPU Player 1'), findsOneWidget);

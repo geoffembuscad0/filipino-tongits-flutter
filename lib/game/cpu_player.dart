@@ -25,6 +25,7 @@ class CpuPlayer {
         return;
       }
       if (!_draw(game, player)) return; // Stock ran out; round is over.
+      if (game.isRoundOver) return;
     }
 
     if (game.phase != TurnPhase.play) {
