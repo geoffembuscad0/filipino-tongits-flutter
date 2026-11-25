@@ -1,11 +1,10 @@
+import 'dart:math';
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
-import 'package:flutter_tongits_offline/game/deal_cards.dart';
-import 'package:flutter_tongits_offline/game/game_state.dart';
-import 'package:flutter_tongits_offline/game/card.dart';
-
 import 'package:flutter_tongits_offline/screens/how_to_play_screen.dart';
+import 'package:flutter_tongits_offline/screens/jack_en_poy_screen.dart';
 
 void main() {
   runApp(const TongitsApp());
@@ -35,31 +34,6 @@ class TongitsApp extends StatelessWidget {
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('The game setup screen is coming next.')),
-    );
-  }
-
-  void _showRulesPreview(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tongits'),
-        content: const Text(
-          'An offline card game against CPU opponents. '
-          'The rules and scoring will be added in a later step.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,7 +48,7 @@ class HomeScreen extends StatelessWidget {
               Color(0xFF081B17),
             ],
             stops: [0.0, 0.58, 1.0],
-          )
+          ),
         ),
         child: SafeArea(
           child: Center(
@@ -122,7 +96,13 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 28),
                     FilledButton.icon(
-                      onPressed: () => _showComingSoon(context),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const JackEnPoyScreen(),
+                          ),
+                        );
+                      },
                       icon: const Icon(Icons.play_arrow),
                       label: const Text('PLAY'),
                       style: FilledButton.styleFrom(
@@ -166,7 +146,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
-        )
+        ),
       ),
     );
   }
@@ -188,7 +168,6 @@ class CardPreviewGame extends FlameGame {
       suit: '♠',
       suitColor: const Color(0xFF18201F),
     );
-
     _drawCard(
       canvas,
       center: Offset(size.x * 0.50, size.y * 0.48),
@@ -197,7 +176,6 @@ class CardPreviewGame extends FlameGame {
       suit: '♥',
       suitColor: const Color(0xFFC63838),
     );
-
     _drawCard(
       canvas,
       center: Offset(size.x * 0.70, size.y * 0.52),
@@ -228,7 +206,10 @@ class CardPreviewGame extends FlameGame {
       width: cardWidth,
       height: cardHeight,
     );
-    final card = RRect.fromRectAndRadius(cardRect, const Radius.circular(10));
+    final card = RRect.fromRectAndRadius(
+      cardRect,
+      const Radius.circular(10),
+    );
 
     canvas.drawShadow(
       Path()..addRRect(card),
@@ -250,7 +231,6 @@ class CardPreviewGame extends FlameGame {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-
     rankPainter.paint(
       canvas,
       const Offset(-cardWidth / 2 + 9, -cardHeight / 2 + 8),
@@ -263,7 +243,6 @@ class CardPreviewGame extends FlameGame {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-
     suitPainter.paint(
       canvas,
       Offset(-suitPainter.width / 2, -suitPainter.height / 2 + 5),

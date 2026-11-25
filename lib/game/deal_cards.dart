@@ -3,6 +3,18 @@ import 'dart:math';
 import 'card.dart';
 import 'game_state.dart';
 
+const int cardsPerPlayer = 12;
+
+List<PlayerState> createDefaultPlayers() => [
+  PlayerState(name: 'You', isCpu: false),
+  PlayerState(name: 'CPU Player 1', isCpu: true),
+  PlayerState(name: 'CPU Player 2', isCpu: true),
+];
+
+/// Shuffles and deals a new three-player game.
+///
+/// Cards are dealt one at a time, starting with [firstPlayerIndex] and
+/// continuing in player order. That same player takes the first turn.
 GameState dealNewGame({
   required List<PlayerState> players,
   required int firstPlayerIndex,
@@ -11,7 +23,9 @@ GameState dealNewGame({
   if (players.length != 3) {
     throw ArgumentError('Tongits setup expects one human and two CPUs.');
   }
-
+  if (firstPlayerIndex < 0 || firstPlayerIndex >= players.length) {
+    throw ArgumentError.value(firstPlayerIndex, 'firstPlayerIndex');
+  }
   if (players.any(
     (player) => player.hand.isNotEmpty || player.melds.isNotEmpty,
   )) {
@@ -23,14 +37,13 @@ GameState dealNewGame({
   final gameRandom = random ?? Random();
   final deck = List<CardId>.generate(52, (id) => id)..shuffle(gameRandom);
 
-  // Deal 12 cards to each player, one at a time.
-  for (var cardNumber = 0; cardNumber < 12; cardNumber++) {
-    for (final player in players) {
-      player.hand.add(deck.removeLast());
+  for (var cardNumber = 0; cardNumber < cardsPerPlayer; cardNumber++) {
+    for (var offset = 0; offset < players.length; offset++) {
+      final playerIndex = (firstPlayerIndex + offset) % players.length;
+      players[playerIndex].hand.add(deck.removeLast());
     }
   }
 
-  // 52 cards - 36 dealt = 16 cards remaining in the stock.
   return GameState(
     players: players,
     stock: deck,
