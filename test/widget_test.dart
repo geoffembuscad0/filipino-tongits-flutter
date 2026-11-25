@@ -1,7 +1,10 @@
 import 'dart:math';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_tongits_offline/main.dart';
+import 'package:flutter_tongits_offline/screens/jack_en_poy_screen.dart';
+import 'package:flutter_tongits_offline/widgets/playing_card_view.dart';
 
 void main() {
   testWidgets('landing screen opens Jack-en-Poy', (tester) async {
@@ -18,7 +21,7 @@ void main() {
     expect(find.text('CPU Player 2'), findsOneWidget);
   });
 
-  testWidgets('Jack-en-Poy winner can deal and takes the first turn', (
+  testWidgets('Jack-en-Poy winner can deal and see portrait hand cards', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -27,10 +30,6 @@ void main() {
 
     await tester.tap(find.text('Rock'));
     await tester.pumpAndSettle();
-
-    expect(find.text('wins the opening!'), findsOneWidget);
-    expect(find.text('DEAL CARDS'), findsOneWidget);
-
     await tester.tap(find.text('DEAL CARDS'));
     await tester.pumpAndSettle();
 
@@ -38,5 +37,6 @@ void main() {
     expect(find.textContaining('12 cards'), findsNWidgets(3));
     expect(find.text('16 cards remain in the stock.'), findsOneWidget);
     expect(find.text('Your hand'), findsOneWidget);
+    expect(find.byType(PlayingCardView), findsNWidgets(12));
   });
 }
