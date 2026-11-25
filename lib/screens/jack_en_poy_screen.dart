@@ -6,6 +6,7 @@ import 'package:flutter_tongits_offline/game/card.dart';
 import 'package:flutter_tongits_offline/game/deal_cards.dart';
 import 'package:flutter_tongits_offline/game/game_state.dart';
 import 'package:flutter_tongits_offline/game/jack_en_poy.dart';
+import 'package:flutter_tongits_offline/widgets/playing_card_view.dart';
 
 class JackEnPoyScreen extends StatefulWidget {
   const JackEnPoyScreen({super.key, Random? random}) : _random = random;
@@ -128,9 +129,7 @@ class _JackEnPoyScreenState extends State<JackEnPoyScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Row(
                               children: [
-                                Expanded(
-                                  child: Text(_playerName(index)),
-                                ),
+                                Expanded(child: Text(_playerName(index))),
                                 Text(
                                   '${result.choices[index].symbol} '
                                   '${result.choices[index].label}',
@@ -234,25 +233,17 @@ class _DealtGameSummary extends StatelessWidget {
             for (final player in game.players)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  player.isCpu
-                      ? '${player.name}: ${player.hand.length} cards'
-                      : '${player.name}: ${player.hand.length} cards',
-                ),
+                child: Text('${player.name}: ${player.hand.length} cards'),
               ),
             const SizedBox(height: 4),
             Text('${game.stock.length} cards remain in the stock.'),
             const SizedBox(height: 16),
-            const Text('Your hand'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final cardId in game.players.first.hand)
-                  Chip(label: Text(PlayingCard(cardId).toString())),
-              ],
+            const Text(
+              'Your hand',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: 8),
+            PlayerHandView(cardIds: game.players.first.hand),
           ],
         ),
       ),
