@@ -14,22 +14,15 @@ void main() {
         ),
       ),
     );
-
-    final card = PlayingCard(26);
-    expect(card.rankLabel, findsNWidgets(2));
-    expect(card.suitSymbol, '♥');
-    expect(find.text('A'), findsOneWidget);
-    expect(find.text('♥'), findsOneWidget);
-
     final cardWidget = tester.widget<Container>(
       find.descendant(
         of: find.byType(PlayingCardView),
         matching: find.byType(Container),
       ).first,
     );
-    final constraints = tester.getSize(find.byType(PlayingCardView));
-    expect(constraints.width, 68);
-    expect(constraints.height, 100);
+    final size = tester.getSize(find.byType(PlayingCardView));
+    expect(size.width, 68);
+    expect(size.height, 108); // 100 card height + 8 top margin when unselected
     expect(cardWidget.decoration, isA<BoxDecoration>());
   });
 

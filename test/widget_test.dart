@@ -14,7 +14,10 @@ void main() {
     expect(find.text('PLAY'), findsOneWidget);
 
     await tester.tap(find.text('PLAY'));
-//    await tester.pumpAndSettle();
+    // The landing screen's Flame game ticks forever, so pumpAndSettle never
+    // settles. Pump through the route transition instead.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Who goes first?'), findsOneWidget);
     expect(find.text('CPU Player 1'), findsOneWidget);
@@ -24,6 +27,11 @@ void main() {
   testWidgets('Jack-en-Poy winner can deal and see portrait hand cards', (
     tester,
   ) async {
+    // Wide window so the horizontal hand list builds every card.
+    tester.view.physicalSize = const Size(1600, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(
       MaterialApp(home: JackEnPoyScreen(random: Random(1))),
     );
