@@ -2,7 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../components/tongits_table.dart';
+import 'package:flutter_tongits_offline/components/tongits_table.dart';
 
 class CpuVsCpuDemoScreen extends StatefulWidget {
   const CpuVsCpuDemoScreen({super.key});

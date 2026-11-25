@@ -1,65 +1,82 @@
 import 'dart:math';
 
-import 'card.dart';
-import 'game_event.dart';
-import 'game_state.dart';
-
+import 'package:flutter_tongits_offline/game/card.dart';
+import 'package:flutter_tongits_offline/game/game_event.dart';
+import 'package:flutter_tongits_offline/game/game_state.dart';
+import 'package:flutter_tongits_offline/game/deal_cards.dart';
 class DealtCard extends GameEvent {
   final int playerIndex;
-  final PlayingCard card;
+  final CardId card;
   const DealtCard(this.playerIndex, this.card);
 }
 
 List<PlayerState> createDefaultPlayers() {
   return [
     PlayerState(name: 'You', isCpu: false),
-    PlayerState(name: 'CPU 1', isCpu: true),
-    PlayerState(name: 'CPU 2', isCpu: true),
+    PlayerState(name: 'CPU Player 1', isCpu: true),
+    PlayerState(name: 'CPU Player 2', isCpu: true),
   ];
 }
 
 List<PlayerState> createCpuDemoPlayers() {
   return [
-    PlayerState(name: 'CPU 1', isCpu: true),
-    PlayerState(name: 'CPU 2', isCpu: true),
-    PlayerState(name: 'CPU 3', isCpu: true),
+    PlayerState(name: 'CPU Player 1', isCpu: true),
+    PlayerState(name: 'CPU Player 2', isCpu: true),
+    PlayerState(name: 'CPU Player 3', isCpu: true),
   ];
 }
 
-GameState dealNewGame(List<PlayerState> players, {Random? random}) {
-  final rng = random ?? Random();
+GameState dealNewGame({
+  required List<PlayerState> players,
+  required int firstPlayerIndex,
+  Random? random,
+}) {
+  // NEW: reject invalid index
+  if (firstPlayerIndex < 0 || firstPlayerIndex >= players.length) {
+    throw ArgumentError.value(
+      firstPlayerIndex,
+      'firstPlayerIndex',
+      'Must be between 0 and ${players.length - 1}',
+    );
+  }
 
-  // 1. Build 52-card deck: id 0-51
-  // rank = (id % 13) + 1, suit = id ~/ 13 in your PlayingCard
-  final deck = List<PlayingCard>.generate(52, (i) => PlayingCard(id: i));
+  final rng = random ?? Random();
+  final deck = List<CardId>.generate(52, (i) => i);
   deck.shuffle(rng);
 
-  // 2. Deal: dealer (player 0) gets 13, others get 12
-  // Tongits rule
   var deckIndex = 0;
   final dealtEvents = <DealtCard>[];
 
-  for (var playerIndex = 0; playerIndex < players.length; playerIndex++) {
-    final count = playerIndex == 0 ? 13 : 12;
-    for (var i = 0; i < count; i++) {
+  // NEW: round-robin dealing, one card at a time
+  // Dealer (firstPlayerIndex) gets 13, others get 12
+  final targetCounts = List<int>.generate(
+    players.length,
+    (i) => i == firstPlayerIndex ? 13 : 12,
+  );
+
+  // 13 rounds max, skip players who are already full
+  for (var round = 0; round < 13; round++) {
+    for (var offset = 0; offset < players.length; offset++) {
+      final playerIndex = (firstPlayerIndex + offset) % players.length;
+      if (round >= targetCounts[playerIndex]) continue;
+
       final card = deck[deckIndex++];
       players[playerIndex].hand.add(card);
       dealtEvents.add(DealtCard(playerIndex, card));
     }
   }
 
-  // 3. Rest goes to stock
   final stock = deck.sublist(deckIndex);
 
-  // 4. Create state
   final game = GameState(
     players: players,
     stock: stock,
     random: rng,
+    currentPlayerIndex: firstPlayerIndex,
+    phase: TurnPhase.play,
   );
+  game.phase = TurnPhase.play;
 
-  // 5. Emit dealt events
   game.events.addAll(dealtEvents);
-
   return game;
 }

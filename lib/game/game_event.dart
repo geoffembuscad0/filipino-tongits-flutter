@@ -1,56 +1,59 @@
 import 'card.dart';
 
-// NOT sealed - DealtCard in deal_cards.dart needs to extend this
 abstract class GameEvent {
   const GameEvent();
+  int get playerIndex;
 }
 
 class DrewFromStock extends GameEvent {
   final int playerIndex;
-  final PlayingCard card;
+  final CardId card;
   const DrewFromStock(this.playerIndex, this.card);
 }
 
 class DrewFromDiscard extends GameEvent {
   final int playerIndex;
-  final List<PlayingCard> meldCards;
+  final List<CardId> meldCards;
   const DrewFromDiscard(this.playerIndex, this.meldCards);
 }
 
 class ExposedMeld extends GameEvent {
   final int playerIndex;
-  final List<PlayingCard> cards;
+  final List<CardId> cards;
   const ExposedMeld(this.playerIndex, this.cards);
 }
 
 class LaidOff extends GameEvent {
   final int playerIndex;
-  final PlayingCard card;
+  final CardId card;
   final int ownerIndex;
   final int meldIndex;
-  final List<PlayingCard> meldCardsAfter;
+  final List<CardId> meldCardsAfter;
   const LaidOff(
     this.playerIndex,
     this.card,
     this.ownerIndex,
-    this.meldIndex,
-    this.meldCardsAfter,
-  );
+    this.meldIndex, [
+    this.meldCardsAfter = const [],
+  ]);
 }
 
 class Discarded extends GameEvent {
   final int playerIndex;
-  final PlayingCard card;
+  final CardId card;
   const Discarded(this.playerIndex, this.card);
 }
 
-// Your UI expects this name, not DrawCalled
+class DrawCalled extends GameEvent {
+  final int playerIndex;
+  const DrawCalled(this.playerIndex);
+}
+
 class CalledDraw extends GameEvent {
   final int playerIndex;
   const CalledDraw(this.playerIndex);
 }
 
-// Keep both names - test uses one, UI uses the other
 class ChallengeAnswered extends GameEvent {
   final int playerIndex;
   final bool fight;
@@ -66,4 +69,7 @@ class ChallengeResponseRecorded extends GameEvent {
 class RoundFinished extends GameEvent {
   final int? winnerIndex;
   const RoundFinished(this.winnerIndex);
+
+  @override
+  int get playerIndex => winnerIndex ?? -1;
 }

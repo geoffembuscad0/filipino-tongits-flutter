@@ -1,8 +1,10 @@
 import 'dart:math';
-
-import 'card.dart';
-import 'game_event.dart';
-import 'meld.dart';
+import 'package:flutter_tongits_offline/game/meld.dart';
+// Should all look like this:
+import 'package:flutter_tongits_offline/game/card.dart';
+import 'package:flutter_tongits_offline/game/game_event.dart';
+import 'package:flutter_tongits_offline/game/game_state.dart';
+import 'package:flutter_tongits_offline/game/deal_cards.dart';
 
 export 'game_event.dart';
 export 'meld.dart';
@@ -71,7 +73,7 @@ class GameState {
   /// Everything that happened since a UI last cleared this list. The engine
   /// only appends; the table replays the events as animations and clears it.
   // DELETE THIS - this is what broke GameState
-  final pending = List<GameEvent>.unmodifiable(events);
+  // final pending = List<GameEvent>.unmodifiable(events);
 
 
   int currentPlayerIndex;

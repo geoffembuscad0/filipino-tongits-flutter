@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_tongits_offline/game/card.dart';
 import 'package:flutter_tongits_offline/game/game_state.dart';
 
+
 int id(Suit suit, int rank) => suit.index * 13 + rank - 1;
 
 GameState gameWith({

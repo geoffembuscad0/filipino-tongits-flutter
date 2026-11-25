@@ -1,7 +1,7 @@
 enum Suit { clubs, diamonds, hearts, spades }
 
 // Add this one line - this makes CardId work everywhere (meld.dart, etc.)
-typedef CardId = PlayingCard;
+typedef CardId = int;
 
 class PlayingCard {
   PlayingCard(this.id);

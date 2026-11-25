@@ -5,11 +5,11 @@ import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
 import 'package:flame/components.dart';
 
-import '../game/card.dart';
-import '../game/cpu_player.dart';
-import '../game/deal_cards.dart';
-import '../game/game_event.dart';
-import '../game/game_state.dart';
+import 'package:flutter_tongits_offline/game/card.dart';
+import 'package:flutter_tongits_offline/game/cpu_player.dart';
+import 'package:flutter_tongits_offline/game/deal_cards.dart';
+import 'package:flutter_tongits_offline/game/game_event.dart';
+import 'package:flutter_tongits_offline/game/game_state.dart';
 import 'card_component.dart';
 
 /// Portrait-first Flame table. The engine resolves a whole CPU turn at once;

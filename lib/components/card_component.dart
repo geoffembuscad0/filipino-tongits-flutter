@@ -3,7 +3,7 @@ import 'package:flame/effects.dart';
 import 'package:flutter/animation.dart';
 import 'package:flutter/painting.dart';
 
-import '../game/card.dart';
+import 'package:flutter_tongits_offline/game/card.dart';
 
 /// One persistent visual object per physical card. The same component is
 /// repositioned as the card moves between stock, hands, melds and discards.

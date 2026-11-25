@@ -5,6 +5,7 @@ import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flame/text.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_tongits_offline/game/game_event.dart';
 
 import 'package:flutter_tongits_offline/game/card.dart';
 import 'package:flutter_tongits_offline/game/cpu_player.dart';
