@@ -1,10 +1,10 @@
 import 'dart:math';
 
 import 'card.dart';
-import 'game_events.dart';
+import 'game_event.dart';
 import 'meld.dart';
 
-export 'game_events.dart';
+export 'game_event.dart';
 export 'meld.dart';
 
 /// - draw: the current player must draw (or call Draw).
@@ -41,11 +41,18 @@ class PlayerState {
 }
 
 class GameState {
+  final List<GameEvent> events = [];
+
+  List<GameEvent> takeEvents() {
+    final pending = List<GameEvent>.unmodifiable(events);
+    events.clear();
+    return pending;
+  }
   GameState({
     required this.players,
     required this.stock,
     required this.random,
-    required this.currentPlayerIndex,
+    this.currentPlayerIndex = 0,
     this.phase = TurnPhase.draw,
   }) {
     if (players.length != 3) {
@@ -63,7 +70,9 @@ class GameState {
 
   /// Everything that happened since a UI last cleared this list. The engine
   /// only appends; the table replays the events as animations and clears it.
-  final List<GameEvent> events = [];
+  // DELETE THIS - this is what broke GameState
+  final pending = List<GameEvent>.unmodifiable(events);
+
 
   int currentPlayerIndex;
   TurnPhase phase;

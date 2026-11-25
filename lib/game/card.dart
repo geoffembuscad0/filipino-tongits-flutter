@@ -1,13 +1,11 @@
-typedef CardId = int;
-
 enum Suit { clubs, diamonds, hearts, spades }
 
-class PlayingCard {
-  const PlayingCard(this.id);
+// Add this one line - this makes CardId work everywhere (meld.dart, etc.)
+typedef CardId = PlayingCard;
 
-  /// IDs 0–12 are clubs, 13–25 diamonds, and so on.
-  /// Within each suit: Ace, 2, 3, ... King.
-  final CardId id;
+class PlayingCard {
+  PlayingCard(this.id);
+  final int id;
 
   Suit get suit => Suit.values[id ~/ 13];
 
