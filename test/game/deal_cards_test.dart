@@ -6,7 +6,7 @@ import 'package:flutter_tongits_offline/game/game_state.dart';
 
 void main() {
   group('dealNewGame', () {
-    test('deals all cards and gives the opening winner first turn', () {
+    test('gives the opening player 13 cards and the first turn', () {
       final players = createDefaultPlayers();
       final game = dealNewGame(
         players: players,
@@ -19,11 +19,16 @@ void main() {
         'CPU Player 1',
         'CPU Player 2',
       ]);
-      expect(players.map((player) => player.hand.length), everyElement(12));
-      expect(game.stock, hasLength(16));
+      expect(players.map((player) => player.hand.length).toList(), [
+        12,
+        12,
+        13,
+      ]);
+      expect(game.stock, hasLength(15));
       expect(game.currentPlayerIndex, 2);
       expect(game.currentPlayer.name, 'CPU Player 2');
-      expect(game.phase, TurnPhase.draw);
+      // The opening player does not draw; they go straight to melding/discarding.
+      expect(game.phase, TurnPhase.play);
       expect(game.hasValidCardConservation, isTrue);
     });
 
@@ -38,6 +43,8 @@ void main() {
           expectedHands[playerIndex].add(expectedDeck.removeLast());
         }
       }
+      // The opening player's 13th card.
+      expectedHands[1].add(expectedDeck.removeLast());
 
       final players = createDefaultPlayers();
       dealNewGame(

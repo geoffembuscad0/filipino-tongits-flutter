@@ -13,8 +13,10 @@ List<PlayerState> createDefaultPlayers() => [
 
 /// Shuffles and deals a new three-player game.
 ///
-/// Cards are dealt one at a time, starting with [firstPlayerIndex] and
-/// continuing in player order. That same player takes the first turn.
+/// Each player gets 12 cards, dealt one at a time starting with
+/// [firstPlayerIndex]. That player then receives a 13th card and takes the
+/// first turn without drawing: they discard (after any melds) to start play.
+/// The remaining 15 cards form the stock.
 GameState dealNewGame({
   required List<PlayerState> players,
   required int firstPlayerIndex,
@@ -44,10 +46,14 @@ GameState dealNewGame({
     }
   }
 
+  // The opening player's 13th card.
+  players[firstPlayerIndex].hand.add(deck.removeLast());
+
   return GameState(
     players: players,
     stock: deck,
     random: gameRandom,
     currentPlayerIndex: firstPlayerIndex,
+    phase: TurnPhase.play,
   );
 }

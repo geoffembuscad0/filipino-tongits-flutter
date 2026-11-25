@@ -34,9 +34,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('First to draw:'), findsOneWidget);
-    expect(find.textContaining('12 cards'), findsNWidgets(3));
-    expect(find.text('16 cards remain in the stock.'), findsOneWidget);
+    // The opening player holds 13 cards; the other two hold 12.
+    expect(find.textContaining('12 cards'), findsNWidgets(2));
+    expect(find.textContaining('13 cards'), findsOneWidget);
+    expect(find.text('15 cards remain in the stock.'), findsOneWidget);
     expect(find.text('Your hand'), findsOneWidget);
-    expect(find.byType(PlayingCardView), findsNWidgets(12));
+    // Your hand is 12 cards, or 13 if you won the opening.
+    expect(find.byType(PlayingCardView).evaluate().length, anyOf(12, 13));
   });
 }
