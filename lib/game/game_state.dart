@@ -1,26 +1,19 @@
 import 'dart:math';
 
 import 'card.dart';
-import 'game_event.dart';
-import 'meld.dart';
+import 'meld_rules.dart';
 
-export 'game_event.dart';
-export 'meld.dart';
+export 'meld_rules.dart' show MeldKind;
 
-enum TurnPhase { draw, play, challenge, roundOver }
+enum TurnPhase { draw, discard, roundOver }
 
-enum RoundEndReason { tongits, stockEmpty, drawChallenge, challengeFolded }
+enum RoundEndReason { tongits, stockEmpty }
 
-class RoundResult {
-  const RoundResult({
-    required this.winnerIndex,
-    required this.reason,
-    required this.deadwood,
-  });
+class Meld {
+  Meld({required this.cards, required this.kind});
 
-  final int? winnerIndex;
-  final RoundEndReason reason;
-  final List<int> deadwood;
+  final List<CardId> cards;
+  final MeldKind kind;
 }
 
 class PlayerState {
@@ -37,161 +30,149 @@ class GameState {
     required this.players,
     required this.stock,
     required this.random,
-    this.currentPlayerIndex = 0,
-    this.dealerIndex = 0,
-    this.phase = TurnPhase.draw,
-  }) {
+    required this.currentPlayerIndex,
+    TurnPhase startPhase = TurnPhase.draw,
+  }) : phase = startPhase {
     if (players.length != 3) {
       throw ArgumentError('This game setup expects exactly three players.');
     }
     if (currentPlayerIndex < 0 || currentPlayerIndex >= players.length) {
       throw ArgumentError.value(currentPlayerIndex, 'currentPlayerIndex');
     }
-    if (dealerIndex < 0 || dealerIndex >= players.length) {
-      throw ArgumentError.value(dealerIndex, 'dealerIndex');
-    }
   }
 
-  final List<GameEvent> events = [];
   final List<PlayerState> players;
   final List<CardId> stock;
   final List<CardId> discardPile = [];
   final Random random;
 
   int currentPlayerIndex;
-  int dealerIndex;
   TurnPhase phase;
 
-  RoundResult? result;
-  int? challengerIndex;
-  final Map<int, bool> _challengeResponses = {};
+  /// Set when the round ends. Null winner with [RoundEndReason.stockEmpty]
+  /// means the lowest hands tied (a draw).
+  int? winnerIndex;
+  RoundEndReason? endReason;
 
-  List<GameEvent> takeEvents() {
-    final pending = List<GameEvent>.unmodifiable(events);
-    events.clear();
-    return pending;
-  }
+  /// A card taken from the discard pile that must be melded or laid off
+  /// before this player may discard.
+  CardId? pendingDiscardCard;
 
   PlayerState get currentPlayer => players[currentPlayerIndex];
-  PlayerState get dealer => players[dealerIndex];
 
-  bool get isRoundOver => phase == TurnPhase.roundOver;
+  int handValue(PlayerState player) => player.hand.fold(
+    0,
+    (sum, id) => sum + PlayingCard(id).deadwoodValue,
+  );
 
-  /// Advances the dealer one seat clockwise in player order:
-  /// You -> CPU Player 1 -> CPU Player 2 -> You.
-  int advanceDealer() {
-    dealerIndex = (dealerIndex + 1) % players.length;
-    return dealerIndex;
+  /// The top discard may only be taken if it can be used immediately,
+  /// either in a new meld with the hand or laid off on an exposed meld.
+  bool get canDrawFromDiscard {
+    if (phase != TurnPhase.draw || discardPile.isEmpty) return false;
+    final top = discardPile.last;
+    if (canFormMeldWith(top, currentPlayer.hand)) return true;
+    for (var owner = 0; owner < players.length; owner++) {
+      for (var i = 0; i < players[owner].melds.length; i++) {
+        if (canLayOff(top, owner, i)) return true;
+      }
+    }
+    return false;
   }
-
-  List<int> get pendingChallengeResponders => phase != TurnPhase.challenge
-      ? <int>[]
-      : [
-          for (var i = 0; i < players.length; i++)
-            if (i != challengerIndex && !_challengeResponses.containsKey(i)) i,
-        ];
 
   CardId? drawFromStock() {
     _requirePhase(TurnPhase.draw);
+
     if (stock.isEmpty) {
-      _endByEmptyStock();
+      _endByStockEmpty();
       return null;
     }
 
     final card = stock.removeLast();
     currentPlayer.hand.add(card);
-    events.add(DrewFromStock(currentPlayerIndex, card));
-    phase = TurnPhase.play;
+    phase = TurnPhase.discard;
     return card;
   }
 
-  void drawFromDiscard(List<CardId> meldCards) {
+  CardId drawFromDiscard() {
     _requirePhase(TurnPhase.draw);
-    if (discardPile.isEmpty) {
-      throw StateError('There is no card in the discard pile.');
+
+    if (!canDrawFromDiscard) {
+      throw StateError('The top discard cannot be used in a meld right now.');
     }
 
-    final top = discardPile.last;
-    if (!meldCards.contains(top)) {
-      throw ArgumentError('The meld must include the top discard.');
-    }
-    final kind = classifyMeld(meldCards);
-    if (kind == null) {
-      throw ArgumentError('Those cards do not form a valid meld.');
-    }
-
-    final fromHand = meldCards.where((id) => id != top).toList();
-    final hand = currentPlayer.hand;
-    if (!fromHand.every(hand.contains)) {
-      throw ArgumentError('${currentPlayer.name} does not hold those cards.');
-    }
-
-    discardPile.removeLast();
-    for (final id in fromHand) {
-      hand.remove(id);
-    }
-    currentPlayer.melds.add(Meld(cards: meldCards, kind: kind));
-    events.add(DrewFromDiscard(currentPlayerIndex, List<CardId>.of(meldCards)));
-    phase = TurnPhase.play;
-    _checkOutOfCards();
+    final card = discardPile.removeLast();
+    currentPlayer.hand.add(card);
+    pendingDiscardCard = card;
+    phase = TurnPhase.discard;
+    return card;
   }
 
-  void exposeMeld(List<CardId> cards) {
-    _requirePhase(TurnPhase.play);
+  /// Exposes a new set or run from the current player's hand.
+  Meld layMeld(List<CardId> cards) {
+    _requirePhase(TurnPhase.discard);
+
     final kind = classifyMeld(cards);
     if (kind == null) {
-      throw ArgumentError('Those cards do not form a valid meld.');
+      throw ArgumentError('Not a valid set or run: $cards');
     }
 
     final hand = currentPlayer.hand;
     if (!cards.every(hand.contains)) {
-      throw ArgumentError('${currentPlayer.name} does not hold those cards.');
+      throw StateError('${currentPlayer.name} does not hold all of $cards.');
     }
 
-    for (final id in cards) {
-      hand.remove(id);
+    hand.removeWhere(cards.contains);
+    final meld = Meld(cards: List<CardId>.of(cards), kind: kind);
+    sortMeldCards(meld.cards, kind);
+    currentPlayer.melds.add(meld);
+
+    if (pendingDiscardCard != null && cards.contains(pendingDiscardCard)) {
+      pendingDiscardCard = null;
     }
-    currentPlayer.melds.add(Meld(cards: cards, kind: kind));
-    events.add(ExposedMeld(currentPlayerIndex, List<CardId>.of(cards)));
-    _checkOutOfCards();
+    if (hand.isEmpty) _endRound(currentPlayerIndex, RoundEndReason.tongits);
+    return meld;
   }
 
-  void layOff(CardId card, Meld meld) {
-    _requirePhase(TurnPhase.play);
-    if (!currentPlayer.hand.contains(card)) {
+  bool canLayOff(CardId card, int ownerIndex, int meldIndex) {
+    final meld = players[ownerIndex].melds[meldIndex];
+    return classifyMeld([...meld.cards, card]) != null;
+  }
+
+  /// Adds [card] to an exposed meld (sapaw / layoff), yours or an opponent's.
+  void layOff(CardId card, int ownerIndex, int meldIndex) {
+    _requirePhase(TurnPhase.discard);
+
+    final hand = currentPlayer.hand;
+    if (!hand.contains(card)) {
       throw StateError('${currentPlayer.name} does not have card $card.');
     }
-    final ownerIndex = players.indexWhere((player) => player.melds.contains(meld));
-    if (ownerIndex == -1) {
-      throw ArgumentError('That meld is not on the table.');
-    }
-    if (!canLayOff(meld, card)) {
-      throw ArgumentError('Card $card cannot be added to that meld.');
+    if (!canLayOff(card, ownerIndex, meldIndex)) {
+      throw ArgumentError('Card $card does not extend that meld.');
     }
 
-    currentPlayer.hand.remove(card);
-    meld.add(card);
-    events.add(
-      LaidOff(
-        currentPlayerIndex,
-        card,
-        ownerIndex,
-        players[ownerIndex].melds.indexOf(meld),
-      ),
-    );
-    _checkOutOfCards();
+    final meld = players[ownerIndex].melds[meldIndex];
+    hand.remove(card);
+    meld.cards.add(card);
+    sortMeldCards(meld.cards, meld.kind);
+
+    if (pendingDiscardCard == card) pendingDiscardCard = null;
+    if (hand.isEmpty) _endRound(currentPlayerIndex, RoundEndReason.tongits);
   }
 
   void discardFromHand(CardId card) {
-    _requirePhase(TurnPhase.play);
+    _requirePhase(TurnPhase.discard);
+
+    if (pendingDiscardCard != null) {
+      throw StateError('Meld or lay off the card taken from the discard first.');
+    }
     if (!currentPlayer.hand.remove(card)) {
       throw StateError('${currentPlayer.name} does not have card $card.');
     }
 
     discardPile.add(card);
-    events.add(Discarded(currentPlayerIndex, card));
+
     if (currentPlayer.hand.isEmpty) {
-      _finish(currentPlayerIndex, RoundEndReason.tongits);
+      _endRound(currentPlayerIndex, RoundEndReason.tongits);
       return;
     }
 
@@ -199,34 +180,8 @@ class GameState {
     phase = TurnPhase.draw;
   }
 
-  void callDraw() {
-    _requirePhase(TurnPhase.draw);
-    if (currentPlayer.melds.isEmpty) {
-      throw StateError('Draw can only be called after exposing a meld.');
-    }
-
-    challengerIndex = currentPlayerIndex;
-    _challengeResponses.clear();
-    events.add(DrawCalled(currentPlayerIndex));
-    phase = TurnPhase.challenge;
-  }
-
-  void respondToChallenge(int playerIndex, {required bool fight}) {
-    _requirePhase(TurnPhase.challenge);
-    if (playerIndex < 0 ||
-        playerIndex >= players.length ||
-        playerIndex == challengerIndex) {
-      throw ArgumentError.value(playerIndex, 'playerIndex');
-    }
-    if (_challengeResponses.containsKey(playerIndex)) {
-      throw StateError('${players[playerIndex].name} already responded.');
-    }
-
-    _challengeResponses[playerIndex] = fight;
-    events.add(ChallengeAnswered(playerIndex, fight));
-    if (pendingChallengeResponders.isEmpty) _resolveChallenge();
-  }
-
+  /// Useful in tests/debugging to ensure a card hasn't been duplicated
+  /// or lost between the deck, hands, discards, and melds.
   bool get hasValidCardConservation {
     final cardsInPlay = <CardId>[
       ...stock,
@@ -241,55 +196,32 @@ class GameState {
         cardsInPlay.every((id) => id >= 0 && id < 52);
   }
 
-  void _resolveChallenge() {
-    final caller = challengerIndex!;
-    final fighters = [
-      for (final entry in _challengeResponses.entries)
-        if (entry.value) entry.key,
-    ]..sort();
-
-    if (fighters.isEmpty) {
-      _finish(caller, RoundEndReason.challengeFolded);
-      return;
-    }
-
-    int deadwoodOf(int index) => deadwoodTotal(players[index].hand);
-    var winner = fighters.first;
-    for (final index in fighters.skip(1)) {
-      if (deadwoodOf(index) < deadwoodOf(winner)) winner = index;
-    }
-    if (deadwoodOf(caller) < deadwoodOf(winner)) winner = caller;
-    _finish(winner, RoundEndReason.drawChallenge);
+  void _endRound(int? winner, RoundEndReason reason) {
+    phase = TurnPhase.roundOver;
+    pendingDiscardCard = null;
+    winnerIndex = winner;
+    endReason = reason;
   }
 
-  void _endByEmptyStock() {
-    final values = [for (final player in players) deadwoodTotal(player.hand)];
+  /// Stock ran out: the lowest hand wins; equal lowest hands are a draw.
+  void _endByStockEmpty() {
+    final values = [for (final player in players) handValue(player)];
     final lowest = values.reduce(min);
-    final leaders = [
+    final lowestPlayers = [
       for (var i = 0; i < values.length; i++)
         if (values[i] == lowest) i,
     ];
-    _finish(leaders.length == 1 ? leaders.first : null, RoundEndReason.stockEmpty);
-  }
-
-  void _checkOutOfCards() {
-    if (currentPlayer.hand.isEmpty) {
-      _finish(currentPlayerIndex, RoundEndReason.tongits);
-    }
-  }
-
-  void _finish(int? winnerIndex, RoundEndReason reason) {
-    result = RoundResult(
-      winnerIndex: winnerIndex,
-      reason: reason,
-      deadwood: [for (final player in players) deadwoodTotal(player.hand)],
+    _endRound(
+      lowestPlayers.length == 1 ? lowestPlayers.first : null,
+      RoundEndReason.stockEmpty,
     );
-    phase = TurnPhase.roundOver;
   }
 
   void _requirePhase(TurnPhase expected) {
     if (phase != expected) {
-      throw StateError('Expected phase $expected, but was $phase.');
+      throw StateError(
+        'Expected phase $expected, but current phase is $phase.',
+      );
     }
   }
 }

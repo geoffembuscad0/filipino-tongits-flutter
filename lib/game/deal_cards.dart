@@ -1,93 +1,59 @@
 import 'dart:math';
 
 import 'card.dart';
-import 'game_event.dart';
 import 'game_state.dart';
 
-class DealtCard extends GameEvent {
-  final int playerIndex;
-  final CardId card;
+const int cardsPerPlayer = 12;
 
-  const DealtCard(this.playerIndex, this.card);
-}
+List<PlayerState> createDefaultPlayers() => [
+  PlayerState(name: 'You', isCpu: false),
+  PlayerState(name: 'CPU Player 1', isCpu: true),
+  PlayerState(name: 'CPU Player 2', isCpu: true),
+];
 
-List<PlayerState> createDefaultPlayers() {
-  return [
-    PlayerState(name: 'You', isCpu: false),
-    PlayerState(name: 'CPU Player 1', isCpu: true),
-    PlayerState(name: 'CPU Player 2', isCpu: true),
-  ];
-}
-
-List<PlayerState> createCpuDemoPlayers() {
-  return [
-    PlayerState(name: 'CPU Player 1', isCpu: true),
-    PlayerState(name: 'CPU Player 2', isCpu: true),
-    PlayerState(name: 'CPU Player 3', isCpu: true),
-  ];
-}
-
-/// Deals 13 cards to the dealer and 12 cards to each other participant.
+/// Shuffles and deals a new three-player game.
 ///
-/// [firstPlayerIndex] is retained as the dealer/opening-player index to keep
-/// compatibility with the current game setup.
+/// Cards are dealt one at a time, starting with [firstPlayerIndex] and
+/// continuing in player order. The first player (the dealer) then receives a
+/// 13th card and opens the round in the discard phase: no draw, only optional
+/// melds followed by a discard.
 GameState dealNewGame({
   required List<PlayerState> players,
   required int firstPlayerIndex,
   Random? random,
 }) {
   if (players.length != 3) {
-    throw ArgumentError('Exactly three players are required.');
+    throw ArgumentError('Tongits setup expects one human and two CPUs.');
   }
   if (firstPlayerIndex < 0 || firstPlayerIndex >= players.length) {
-    throw ArgumentError.value(
-      firstPlayerIndex,
-      'firstPlayerIndex',
-      'Must be between 0 and ${players.length - 1}',
+    throw ArgumentError.value(firstPlayerIndex, 'firstPlayerIndex');
+  }
+  if (players.any(
+    (player) => player.hand.isNotEmpty || player.melds.isNotEmpty,
+  )) {
+    throw ArgumentError(
+      'Players must have empty hands and melds before dealing.',
     );
   }
 
-  final rng = random ?? Random();
-  final deck = List<CardId>.generate(52, (index) => index)..shuffle(rng);
-  final dealtEvents = <DealtCard>[];
+  final gameRandom = random ?? Random();
+  final deck = List<CardId>.generate(52, (id) => id)..shuffle(gameRandom);
 
-  final targetCounts = List<int>.generate(
-    players.length,
-    (index) => index == firstPlayerIndex ? 13 : 12,
-  );
-
-  for (var round = 0; round < 13; round++) {
+  for (var cardNumber = 0; cardNumber < cardsPerPlayer; cardNumber++) {
     for (var offset = 0; offset < players.length; offset++) {
       final playerIndex = (firstPlayerIndex + offset) % players.length;
-      if (round >= targetCounts[playerIndex]) continue;
-
-      final card = deck.removeLast();
-      players[playerIndex].hand.add(card);
-      dealtEvents.add(DealtCard(playerIndex, card));
+      players[playerIndex].hand.add(deck.removeLast());
     }
   }
 
-  final stock = deck;
-  final game = GameState(
+  // The dealer starts with 13 cards and discards first.
+  players[firstPlayerIndex].hand.add(deck.removeLast());
+
+  return GameState(
     players: players,
-    stock: stock,
-    random: rng,
+    stock: deck,
+    random: gameRandom,
     currentPlayerIndex: firstPlayerIndex,
-    dealerIndex: firstPlayerIndex,
-    phase: TurnPhase.play,
+    startPhase: TurnPhase.discard,
   );
-
-  game.events.addAll(dealtEvents);
-  return game;
-}
-
-/// Returns the next dealer seat, moving clockwise through player order.
-int nextDealerIndex(int currentDealerIndex, {int playerCount = 3}) {
-  if (playerCount < 1) {
-    throw ArgumentError.value(playerCount, 'playerCount');
-  }
-  if (currentDealerIndex < 0 || currentDealerIndex >= playerCount) {
-    throw ArgumentError.value(currentDealerIndex, 'currentDealerIndex');
-  }
-  return (currentDealerIndex + 1) % playerCount;
 }

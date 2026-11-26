@@ -6,7 +6,7 @@ import 'package:flutter_tongits_offline/game/game_state.dart';
 
 void main() {
   group('dealNewGame', () {
-    test('gives the opening player 13 cards and the first turn', () {
+    test('dealer gets 13 cards and opens in the discard phase', () {
       final players = createDefaultPlayers();
       final game = dealNewGame(
         players: players,
@@ -19,20 +19,15 @@ void main() {
         'CPU Player 1',
         'CPU Player 2',
       ]);
-      expect(players.map((player) => player.hand.length).toList(), [
-        12,
-        12,
-        13,
-      ]);
+      expect(players.map((player) => player.hand.length).toList(), [12, 12, 13]);
       expect(game.stock, hasLength(15));
       expect(game.currentPlayerIndex, 2);
       expect(game.currentPlayer.name, 'CPU Player 2');
-      // The opening player does not draw; they go straight to melding/discarding.
-      expect(game.phase, TurnPhase.play);
+      expect(game.phase, TurnPhase.discard);
       expect(game.hasValidCardConservation, isTrue);
     });
 
-    test('deals starting with winner and continues in player order', () {
+    test('deals starting with winner, then gives the dealer a 13th card', () {
       const seed = 4321;
       final expectedDeck = List<int>.generate(52, (id) => id)
         ..shuffle(Random(seed));
@@ -43,15 +38,10 @@ void main() {
           expectedHands[playerIndex].add(expectedDeck.removeLast());
         }
       }
-      // The opening player's 13th card.
       expectedHands[1].add(expectedDeck.removeLast());
 
       final players = createDefaultPlayers();
-      dealNewGame(
-        players: players,
-        firstPlayerIndex: 1,
-        random: Random(seed),
-      );
+      dealNewGame(players: players, firstPlayerIndex: 1, random: Random(seed));
 
       for (var index = 0; index < players.length; index++) {
         expect(players[index].hand, expectedHands[index]);
