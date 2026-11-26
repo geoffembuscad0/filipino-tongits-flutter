@@ -8,6 +8,7 @@ import '../game/dice_roll.dart';
 import '../game/dice_roll_flame_game.dart';
 import '../game/game_state.dart';
 import '../widgets/playing_card_view.dart';
+import '../screens/game_table_screen.dart';
 
 class DiceRollScreen extends StatefulWidget {
   const DiceRollScreen({super.key, Random? random}) : _random = random;
@@ -86,13 +87,20 @@ class _DiceRollScreenState extends State<DiceRollScreen> {
     final dealer = _dealerIndex;
     if (dealer == null) return;
 
-    setState(() {
-      _game = dealNewGame(
-        players: createDefaultPlayers(),
-        firstPlayerIndex: dealer,
-        random: _random,
-      );
-    });
+    final game = dealNewGame(
+      players: createDefaultPlayers(),
+      firstPlayerIndex: dealer,
+      random: _random,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => GameTableScreen(
+          game: game,
+          dealerIndex: dealer,
+        ),
+      ),
+    );
   }
 
   void _startNewGame() {
@@ -177,7 +185,7 @@ class _DiceRollScreenState extends State<DiceRollScreen> {
                   ),
                 )
               else ...[
-                _DealtGameSummary(game: game),
+                //_DealtGameSummary(game: game),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _startNewGame,
@@ -240,7 +248,7 @@ class _DealtGameSummary extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Dealer: ${game.dealer.name}',
+              'Dealer: ${game.currentPlayer.name}',
               style: const TextStyle(
                 color: Color(0xFFF1D58A),
                 fontWeight: FontWeight.bold,
