@@ -1,12 +1,13 @@
 import 'dart:math';
 
-import 'package:flutter_tongits_offline/game/card.dart';
-import 'package:flutter_tongits_offline/game/game_event.dart';
-import 'package:flutter_tongits_offline/game/game_state.dart';
-import 'package:flutter_tongits_offline/game/deal_cards.dart';
+import 'card.dart';
+import 'game_event.dart';
+import 'game_state.dart';
+
 class DealtCard extends GameEvent {
   final int playerIndex;
   final CardId card;
+
   const DealtCard(this.playerIndex, this.card);
 }
 
@@ -26,12 +27,18 @@ List<PlayerState> createCpuDemoPlayers() {
   ];
 }
 
+/// Deals 13 cards to the dealer and 12 cards to each other participant.
+///
+/// [firstPlayerIndex] is retained as the dealer/opening-player index to keep
+/// compatibility with the current game setup.
 GameState dealNewGame({
   required List<PlayerState> players,
   required int firstPlayerIndex,
   Random? random,
 }) {
-  // NEW: reject invalid index
+  if (players.length != 3) {
+    throw ArgumentError('Exactly three players are required.');
+  }
   if (firstPlayerIndex < 0 || firstPlayerIndex >= players.length) {
     throw ArgumentError.value(
       firstPlayerIndex,
@@ -41,42 +48,46 @@ GameState dealNewGame({
   }
 
   final rng = random ?? Random();
-  final deck = List<CardId>.generate(52, (i) => i);
-  deck.shuffle(rng);
-
-  var deckIndex = 0;
+  final deck = List<CardId>.generate(52, (index) => index)..shuffle(rng);
   final dealtEvents = <DealtCard>[];
 
-  // NEW: round-robin dealing, one card at a time
-  // Dealer (firstPlayerIndex) gets 13, others get 12
   final targetCounts = List<int>.generate(
     players.length,
-    (i) => i == firstPlayerIndex ? 13 : 12,
+    (index) => index == firstPlayerIndex ? 13 : 12,
   );
 
-  // 13 rounds max, skip players who are already full
   for (var round = 0; round < 13; round++) {
     for (var offset = 0; offset < players.length; offset++) {
       final playerIndex = (firstPlayerIndex + offset) % players.length;
       if (round >= targetCounts[playerIndex]) continue;
 
-      final card = deck[deckIndex++];
+      final card = deck.removeLast();
       players[playerIndex].hand.add(card);
       dealtEvents.add(DealtCard(playerIndex, card));
     }
   }
 
-  final stock = deck.sublist(deckIndex);
-
+  final stock = deck;
   final game = GameState(
     players: players,
     stock: stock,
     random: rng,
     currentPlayerIndex: firstPlayerIndex,
+    dealerIndex: firstPlayerIndex,
     phase: TurnPhase.play,
   );
-  game.phase = TurnPhase.play;
 
   game.events.addAll(dealtEvents);
   return game;
+}
+
+/// Returns the next dealer seat, moving clockwise through player order.
+int nextDealerIndex(int currentDealerIndex, {int playerCount = 3}) {
+  if (playerCount < 1) {
+    throw ArgumentError.value(playerCount, 'playerCount');
+  }
+  if (currentDealerIndex < 0 || currentDealerIndex >= playerCount) {
+    throw ArgumentError.value(currentDealerIndex, 'currentDealerIndex');
+  }
+  return (currentDealerIndex + 1) % playerCount;
 }

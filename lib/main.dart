@@ -1,10 +1,8 @@
-import 'dart:math';
-
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_tongits_offline/screens/how_to_play_screen.dart';
-import 'package:flutter_tongits_offline/screens/jack_en_poy_screen.dart';
+import 'package:flutter_tongits_offline/screens/dice_roll_screen.dart';
 
 void main() {
   runApp(const TongitsApp());
@@ -99,7 +97,7 @@ class HomeScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => const JackEnPoyScreen(),
+                            builder: (_) => const DiceRollScreen(),
                           ),
                         );
                       },
