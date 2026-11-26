@@ -237,10 +237,9 @@ class _GameTableScreenState extends State<GameTableScreen> {
           ),
           actions: [
             FilledButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(
+              dialogContext,
+            ).popUntil((route) => route.isFirst),
               child: const Text('BACK'),
             ),
           ],
