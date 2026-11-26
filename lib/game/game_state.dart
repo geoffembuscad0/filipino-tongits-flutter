@@ -178,6 +178,11 @@ class GameState {
 
     currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
     phase = TurnPhase.draw;
+
+    // Stock exhausted: if the next player has nothing to draw (and can't use
+    // the discard), the round ends now with a showdown instead of waiting
+    // for a stock tap that can never happen.
+    if (stock.isEmpty && !canDrawFromDiscard) _endByStockEmpty();
   }
 
   /// Last-resort recovery that always ends the current turn: draws from the
