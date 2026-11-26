@@ -259,7 +259,7 @@ class _GameTableScreenState extends State<GameTableScreen> {
 
   String get _hint {
     if (_game.phase == TurnPhase.roundOver) return 'Round over';
-    if (!_humanTurn) return '${_game.currentPlayer.name} is playing…';
+    if (!_humanTurn) return '${_game.currentPlayer.name}’s turn…';
     if (_game.phase == TurnPhase.draw) {
       return 'Draw from the stock, or take the discard if it makes a meld.';
     }
