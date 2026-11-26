@@ -87,16 +87,20 @@ class _DiceRollScreenState extends State<DiceRollScreen> {
     final dealer = _dealerIndex;
     if (dealer == null) return;
 
-    setState(() {
-      final game = dealNewGame(
-        players: createDefaultPlayers(),
-        firstPlayerIndex: dealer,
-        random: _random,
-      );
-      Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => GameTableScreen(game: game, dealerIndex: dealer),
-      ));
-    });
+    final game = dealNewGame(
+      players: createDefaultPlayers(),
+      firstPlayerIndex: dealer,
+      random: _random,
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => GameTableScreen(
+          game: game,
+          dealerIndex: dealer,
+        ),
+      ),
+    );
   }
 
   void _startNewGame() {

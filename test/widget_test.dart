@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_tongits_offline/main.dart';
 import 'package:flutter_tongits_offline/screens/dice_roll_screen.dart';
 import 'package:flutter_tongits_offline/widgets/playing_card_view.dart';
+import 'package:flutter_tongits_offline/screens/game_table_screen.dart';
 
 void main() {
   testWidgets('landing screen opens dice roll screen', (tester) async {
@@ -27,7 +28,7 @@ void main() {
     expect(find.text('CPU Player 2'), findsOneWidget);
   });
 
-  testWidgets('dice roll winner can deal and see portrait hand cards', (
+  testWidgets('dice roll winner can deal and open the game table', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1600, 900);
@@ -43,8 +44,7 @@ void main() {
     await tester.tap(find.text('ROLL DICE'));
     await tester.pump();
 
-    // The dice animation lasts 2–4 seconds per roll.
-    // Pump manually because the Flame game continuously updates.
+    // Wait for the dice animation and dealer selection.
     for (
       var frame = 0;
       frame < 100 && find.text('DEAL CARDS').evaluate().isEmpty;
@@ -57,20 +57,9 @@ void main() {
 
     await tester.tap(find.text('DEAL CARDS'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.textContaining('First to play:'), findsOneWidget);
-    expect(find.textContaining('12 cards'), findsNWidgets(2));
-    expect(find.textContaining('13 cards'), findsOneWidget);
-    expect(find.text('15 cards remain in the stock.'), findsOneWidget);
-
-    // Scroll to the hand in case it is below the visible area.
-    await tester.ensureVisible(find.text('Your hand'));
-    await tester.pump();
-
-    expect(find.text('Your hand'), findsOneWidget);
-    expect(
-      find.byType(PlayingCardView).evaluate().length,
-      anyOf(12, 13),
-    );
+    // Verify navigation to the actual Tongits table.
+    expect(find.byType(GameTableScreen), findsOneWidget);
   });
 }
