@@ -180,6 +180,30 @@ class GameState {
     phase = TurnPhase.draw;
   }
 
+  /// Last-resort recovery that always ends the current turn: draws from the
+  /// stock if needed, drops any pending discard-pile requirement and discards
+  /// the last card. Only used when normal CPU logic fails.
+  void forceEndTurn() {
+    if (phase == TurnPhase.roundOver) return;
+
+    if (phase == TurnPhase.draw) {
+      if (stock.isEmpty) {
+        _endByStockEmpty();
+        return;
+      }
+      currentPlayer.hand.add(stock.removeLast());
+      phase = TurnPhase.discard;
+    }
+
+    pendingDiscardCard = null;
+    final hand = currentPlayer.hand;
+    if (hand.isEmpty) {
+      _endRound(currentPlayerIndex, RoundEndReason.tongits);
+      return;
+    }
+    discardFromHand(hand.last);
+  }
+
   /// Useful in tests/debugging to ensure a card hasn't been duplicated
   /// or lost between the deck, hands, discards, and melds.
   bool get hasValidCardConservation {

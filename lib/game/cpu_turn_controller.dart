@@ -63,6 +63,15 @@ class CpuTurnController {
       }
     });
 
+    try {
+      await _runSteps(turnId, name);
+    } catch (error, stack) {
+      debugPrint('CPU turn failed for $name: $error\n$stack');
+      _recover(turnId, name);
+    }
+  }
+
+  Future<void> _runSteps(int turnId, String name) async {
     bool alive() => !_disposed && turnId == _turnId;
     Future<bool> pause() async {
       await Future<void>.delayed(stepDelay);
@@ -123,8 +132,28 @@ class CpuTurnController {
     secondsLeft.value = 0;
 
     final name = game.currentPlayer.name;
-    cpu.finishTurnNow(game);
+    try {
+      cpu.finishTurnNow(game);
+    } catch (error, stack) {
+      debugPrint('CPU timeout fallback failed for $name: $error\n$stack');
+      game.forceEndTurn();
+    }
     status.value = '$name ran out of time and finished the turn';
+    onChanged?.call();
+  }
+
+  /// A step threw: finish the turn immediately so the game never stalls.
+  void _recover(int turnId, String name) {
+    if (_disposed || turnId != _turnId) return;
+
+    _stopClock();
+    try {
+      cpu.finishTurnNow(game);
+    } catch (error, stack) {
+      debugPrint('CPU recovery failed for $name: $error\n$stack');
+      game.forceEndTurn();
+    }
+    status.value = '$name finished the turn';
     onChanged?.call();
   }
 
