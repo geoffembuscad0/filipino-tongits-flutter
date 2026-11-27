@@ -12,6 +12,21 @@ class LayOffMove {
 }
 
 class CpuPlayer {
+  /// A CPU calls Draw at the start of its turn when it has exposed a meld
+  /// and its hand is worth at most this many points.
+  static const int drawCallThreshold = 12;
+
+  /// A CPU fights a Draw challenge when its own hand is worth at most this.
+  static const int fightThreshold = 12;
+
+  bool shouldCallDraw(GameState game) {
+    if (game.phase != TurnPhase.draw || !game.canCallDraw) return false;
+    return game.handValue(game.currentPlayer) <= drawCallThreshold;
+  }
+
+  bool shouldFight(GameState game, int playerIndex) =>
+      game.handValue(game.players[playerIndex]) <= fightThreshold;
+
   /// Plays a whole turn instantly (tests and simple callers).
   void playTurn(GameState game) {
     _assertCpuTurn(game);

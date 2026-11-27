@@ -5,9 +5,11 @@ import 'meld_rules.dart';
 
 export 'meld_rules.dart' show MeldKind;
 
-enum TurnPhase { draw, discard, roundOver }
+/// [challenge] is the pause after a player calls Draw, while the other
+/// players answer Fight or Fold.
+enum TurnPhase { draw, discard, challenge, roundOver }
 
-enum RoundEndReason { tongits, stockEmpty }
+enum RoundEndReason { tongits, stockEmpty, drawChallenge, challengeFolded }
 
 class Meld {
   Meld({required this.cards, required this.kind});
@@ -58,6 +60,12 @@ class GameState {
   /// before this player may discard.
   CardId? pendingDiscardCard;
 
+  /// Who called Draw (valid during and after a challenge).
+  int? challengerIndex;
+
+  /// Fight (true) or Fold (false) answers, keyed by player index.
+  final Map<int, bool> challengeResponses = {};
+
   PlayerState get currentPlayer => players[currentPlayerIndex];
 
   int handValue(PlayerState player) => player.hand.fold(
@@ -77,6 +85,85 @@ class GameState {
       }
     }
     return false;
+  }
+
+  /// A player may call Draw at the start of their turn (before drawing) once
+  /// they have exposed at least one meld.
+  bool get canCallDraw =>
+      phase == TurnPhase.draw && currentPlayer.melds.isNotEmpty;
+
+  /// Players who still have to answer the current challenge, in turn order
+  /// starting after the caller.
+  List<int> get pendingChallengeResponders {
+    final caller = challengerIndex;
+    if (phase != TurnPhase.challenge || caller == null) return const [];
+
+    final pending = <int>[];
+    for (var offset = 1; offset < players.length; offset++) {
+      final index = (caller + offset) % players.length;
+      if (!challengeResponses.containsKey(index)) pending.add(index);
+    }
+    return pending;
+  }
+
+  /// Calls Draw instead of drawing. The other players now answer Fight or Fold.
+  void callDraw() {
+    _requirePhase(TurnPhase.draw);
+    if (!canCallDraw) {
+      throw StateError('Expose at least one meld before calling Draw.');
+    }
+
+    challengerIndex = currentPlayerIndex;
+    challengeResponses.clear();
+    phase = TurnPhase.challenge;
+  }
+
+  /// Records [playerIndex]'s answer. When everyone has answered, the round
+  /// is resolved:
+  /// * everyone folds: the caller wins;
+  /// * otherwise the lowest hand among the caller and the players who chose
+  ///   Fight wins, and folders lose. A tie goes against the caller; if the
+  ///   lowest hand is still tied between fighters it is a draw.
+  void respondToChallenge(int playerIndex, bool fight) {
+    _requirePhase(TurnPhase.challenge);
+    if (!pendingChallengeResponders.contains(playerIndex)) {
+      throw StateError('Player $playerIndex cannot answer the challenge now.');
+    }
+
+    challengeResponses[playerIndex] = fight;
+    if (pendingChallengeResponders.isEmpty) _resolveChallenge();
+  }
+
+  void _resolveChallenge() {
+    final caller = challengerIndex!;
+    final fighters = [
+      for (final entry in challengeResponses.entries)
+        if (entry.value) entry.key,
+    ];
+
+    if (fighters.isEmpty) {
+      _endRound(caller, RoundEndReason.challengeFolded);
+      return;
+    }
+
+    final contenders = [caller, ...fighters];
+    final lowest = contenders
+        .map((index) => handValue(players[index]))
+        .reduce(min);
+    var winners = [
+      for (final index in contenders)
+        if (handValue(players[index]) == lowest) index,
+    ];
+
+    // Ties go against the player who called Draw.
+    if (winners.length > 1) {
+      winners = winners.where((index) => index != caller).toList();
+    }
+
+    _endRound(
+      winners.length == 1 ? winners.single : null,
+      RoundEndReason.drawChallenge,
+    );
   }
 
   CardId? drawFromStock() {
@@ -190,6 +277,14 @@ class GameState {
   /// the last card. Only used when normal CPU logic fails.
   void forceEndTurn() {
     if (phase == TurnPhase.roundOver) return;
+
+    if (phase == TurnPhase.challenge) {
+      // Anyone who still hasn't answered folds.
+      for (final index in pendingChallengeResponders.toList()) {
+        respondToChallenge(index, false);
+      }
+      return;
+    }
 
     if (phase == TurnPhase.draw) {
       if (stock.isEmpty) {

@@ -128,15 +128,17 @@ class TongitsTableGame extends FlameGame {
     }
 
     // Opponent hands: small face-down stacks on the left and right edges.
+    // They are turned face up (and spread a little) for the showdown.
+    final reveal = game.phase == TurnPhase.roundOver;
     for (var p = 1; p <= 2; p++) {
       final hand = game.players[p].hand;
       final x = p == 1 ? w * 0.075 : w * 0.925;
       for (var i = 0; i < hand.length; i++) {
         targets[hand[i]] = _Target(
-          Vector2(x, h * 0.34 + _cardH * 0.31 + i * 8),
+          Vector2(x, h * 0.34 + _cardH * 0.31 + i * (reveal ? 12 : 8)),
           0.62,
           300 + i,
-          false,
+          reveal,
           CardZone.opponentHand,
           ownerIndex: p,
         );
