@@ -42,12 +42,17 @@ class CpuTurnController {
   Duration _remaining = Duration.zero;
   int _turnId = 0;
   bool _disposed = false;
+  bool _responding = false;
 
   bool get isRunning => _ticker != null;
 
   Future<void> startTurn() async {
     if (_disposed || _ticker != null) return;
-    if (!game.currentPlayer.isCpu || game.phase == TurnPhase.roundOver) return;
+    if (!game.currentPlayer.isCpu) return;
+    if (game.phase == TurnPhase.roundOver ||
+        game.phase == TurnPhase.challenge) {
+      return;
+    }
 
     final turnId = ++_turnId;
     final name = game.currentPlayer.name;
@@ -81,6 +86,13 @@ class CpuTurnController {
     bool over() => game.phase == TurnPhase.roundOver;
 
     if (!await pause()) return;
+
+    // 0. A confident CPU calls Draw instead of drawing.
+    if (game.phase == TurnPhase.draw && cpu.shouldCallDraw(game)) {
+      game.callDraw();
+      status.value = '$name called DRAW!';
+      return _endTurn();
+    }
 
     // 1. Draw (the dealer's opening turn skips this).
     if (game.phase == TurnPhase.draw) {
@@ -118,6 +130,43 @@ class CpuTurnController {
     final card = cpu.discardStep(game);
     status.value = '$name discarded ${PlayingCard(card)}';
     _endTurn();
+  }
+
+  /// Answers a Draw challenge for every CPU that still has to respond, one
+  /// at a time. The human answers through the UI; this simply waits for them.
+  Future<void> runChallengeResponses() async {
+    if (_disposed || _responding || game.phase != TurnPhase.challenge) return;
+
+    _responding = true;
+    try {
+      while (!_disposed && game.phase == TurnPhase.challenge) {
+        int? next;
+        for (final index in game.pendingChallengeResponders) {
+          if (game.players[index].isCpu) {
+            next = index;
+            break;
+          }
+        }
+        if (next == null) break; // Waiting on the human, or already resolved.
+
+        await Future<void>.delayed(stepDelay);
+        if (_disposed || game.phase != TurnPhase.challenge) break;
+
+        final name = game.players[next].name;
+        final fight = cpu.shouldFight(game, next);
+        game.respondToChallenge(next, fight);
+        status.value = fight ? '$name chose to FIGHT!' : '$name folded.';
+        onChanged?.call();
+      }
+    } catch (error, stack) {
+      debugPrint('CPU challenge response failed: $error\n$stack');
+      if (!_disposed) {
+        game.forceEndTurn();
+        onChanged?.call();
+      }
+    } finally {
+      _responding = false;
+    }
   }
 
   void _endTurn() {

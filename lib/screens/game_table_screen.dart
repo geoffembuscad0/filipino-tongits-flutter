@@ -40,6 +40,7 @@ class _GameTableScreenState extends State<GameTableScreen> {
 
   bool _sortBySuit = false;
   bool _resultShown = false;
+  bool _challengeDialogOpen = false;
 
   bool get _humanTurn =>
       _game.currentPlayerIndex == 0 && _game.phase != TurnPhase.roundOver;
@@ -96,7 +97,17 @@ class _GameTableScreenState extends State<GameTableScreen> {
       _showResult();
       return;
     }
+    if (_game.phase == TurnPhase.challenge) {
+      _handleChallenge();
+      return;
+    }
     if (_game.currentPlayer.isCpu) unawaited(_cpu.startTurn());
+  }
+
+  /// A Draw was called: CPUs answer on their own, you answer with a dialog.
+  void _handleChallenge() {
+    unawaited(_cpu.runChallengeResponses());
+    if (_game.pendingChallengeResponders.contains(0)) _showChallengeDialog();
   }
 
   void _say(String message) => _cpu.status.value = message;
@@ -186,6 +197,59 @@ class _GameTableScreenState extends State<GameTableScreen> {
     _afterChange();
   }
 
+  bool get _canCallDraw => _humanDrawing && _game.canCallDraw;
+
+  void _callDraw() {
+    if (!_canCallDraw) return;
+    _selected.clear();
+    _game.callDraw();
+    _say('You called DRAW!');
+    _afterChange();
+  }
+
+  void _showChallengeDialog() {
+    if (_challengeDialogOpen) return;
+    _challengeDialogOpen = true;
+
+    final caller = _game.players[_game.challengerIndex!];
+    final myPoints = _game.handValue(_game.players[0]);
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        void answer(bool fight) {
+          Navigator.of(dialogContext).pop();
+          _challengeDialogOpen = false;
+          if (_game.phase != TurnPhase.challenge) return;
+          _game.respondToChallenge(0, fight);
+          _say(fight ? 'You chose to FIGHT!' : 'You folded.');
+          _afterChange();
+        }
+
+        return AlertDialog(
+          title: Text('${caller.name} called Draw!'),
+          content: Text(
+            'Your hand is worth $myPoints points.\n\n'
+            'FIGHT: hands are revealed and the lowest total wins. '
+            'If you tie with ${caller.name}, you win.\n'
+            'FOLD: you lose this round.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => answer(false),
+              child: const Text('FOLD'),
+            ),
+            FilledButton(
+              onPressed: () => answer(true),
+              child: const Text('FIGHT'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _sortHand() {
     final hand = _game.players[0].hand;
     int bySuit(CardId a, CardId b) {
@@ -225,14 +289,14 @@ class _GameTableScreenState extends State<GameTableScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _game.endReason == RoundEndReason.tongits
-                    ? 'The winner emptied their hand.'
-                    : 'The stock ran out - lowest hand wins.',
-              ),
+              Text(_resultReason()),
               const SizedBox(height: 12),
-              for (final player in _game.players)
-                Text('${player.name}: ${_game.handValue(player)} points left'),
+              for (var i = 0; i < _game.players.length; i++)
+                Text(
+                  '${_game.players[i].name}: '
+                  '${_game.handValue(_game.players[i])} points left'
+                  '${_resultTag(i)}',
+                ),
             ],
           ),
           actions: [
@@ -253,14 +317,48 @@ class _GameTableScreenState extends State<GameTableScreen> {
     if (index == null) return 'It’s a draw!';
     final player = _game.players[index];
     final who = player.isCpu ? '${player.name} wins' : 'You win';
-    return _game.endReason == RoundEndReason.tongits ? '$who with Tongits!' : who;
+    return switch (_game.endReason) {
+      RoundEndReason.tongits => '$who with Tongits!',
+      RoundEndReason.challengeFolded => '$who - everyone folded!',
+      RoundEndReason.drawChallenge => '$who the Draw challenge!',
+      _ => who,
+    };
+  }
+
+  String _resultReason() => switch (_game.endReason) {
+    RoundEndReason.tongits => 'The winner emptied their hand.',
+    RoundEndReason.stockEmpty => 'The stock ran out - lowest hand wins.',
+    RoundEndReason.challengeFolded =>
+      '${_game.players[_game.challengerIndex!].name} called Draw and '
+          'the others folded.',
+    RoundEndReason.drawChallenge =>
+      'Draw challenge: the lowest hand wins, and a tie goes against the '
+          'caller.',
+    null => '',
+  };
+
+  /// Marks the caller and folders in the showdown list.
+  String _resultTag(int index) {
+    if (_game.endReason != RoundEndReason.drawChallenge &&
+        _game.endReason != RoundEndReason.challengeFolded) {
+      return '';
+    }
+    if (index == _game.challengerIndex) return ' (called Draw)';
+    return _game.challengeResponses[index] == false ? ' (folded)' : ' (fought)';
   }
 
   String get _hint {
     if (_game.phase == TurnPhase.roundOver) return 'Round over';
+    if (_game.phase == TurnPhase.challenge) {
+      return _game.pendingChallengeResponders.contains(0)
+          ? 'Fight or fold?'
+          : 'Waiting for the answers…';
+    }
     if (!_humanTurn) return '${_game.currentPlayer.name}’s turn…';
     if (_game.phase == TurnPhase.draw) {
-      return 'Draw from the stock, or take the discard if it makes a meld.';
+      return _game.canCallDraw
+          ? 'Draw a card, or call DRAW to challenge.'
+          : 'Draw from the stock, or take the discard if it makes a meld.';
     }
     if (_game.pendingDiscardCard != null) {
       return 'Meld or lay off the card you took.';
@@ -324,6 +422,7 @@ class _GameTableScreenState extends State<GameTableScreen> {
                   child: _ActionPanel(
                     onMeld: _canMeld ? _meldSelected : null,
                     onDiscard: _canDiscard ? _discardSelected : null,
+                    onCallDraw: _canCallDraw ? _callDraw : null,
                     onSort: _sortHand,
                   ),
                 ),
@@ -336,7 +435,9 @@ class _GameTableScreenState extends State<GameTableScreen> {
   }
 
   bool _isActive(int index) =>
-      _game.phase != TurnPhase.roundOver && _game.currentPlayerIndex == index;
+      _game.phase != TurnPhase.roundOver &&
+      _game.phase != TurnPhase.challenge &&
+      _game.currentPlayerIndex == index;
 }
 
 class _OpponentPanel extends StatelessWidget {
@@ -542,11 +643,13 @@ class _ActionPanel extends StatelessWidget {
   const _ActionPanel({
     required this.onMeld,
     required this.onDiscard,
+    required this.onCallDraw,
     required this.onSort,
   });
 
   final VoidCallback? onMeld;
   final VoidCallback? onDiscard;
+  final VoidCallback? onCallDraw;
   final VoidCallback onSort;
 
   @override
@@ -576,6 +679,14 @@ class _ActionPanel extends StatelessWidget {
           ),
           onPressed: onDiscard,
           child: const Text('DISCARD'),
+        ),
+        const SizedBox(height: 4),
+        FilledButton(
+          style: style.copyWith(
+            backgroundColor: const WidgetStatePropertyAll(Color(0xFF2F5D8A)),
+          ),
+          onPressed: onCallDraw,
+          child: const Text('CALL DRAW'),
         ),
         const SizedBox(height: 4),
         FilledButton.tonal(style: style, onPressed: onSort, child: const Text('SORT')),
